@@ -407,6 +407,6 @@ For issues, questions, or suggestions:
 
 ---
 
-**Built with ❤️ by Geoffrey Getaro Maroa**
+**Built with  by rey**
 
 **Last Updated**: July 2026 | **Version**: 1.0.0
