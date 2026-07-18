@@ -2,7 +2,7 @@
 Configuration module for AI Humanizer application.
 Handles environment variables and application settings.
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 
 
@@ -24,8 +24,14 @@ class Settings(BaseSettings):
     min_text_length: int = int(os.getenv("MIN_TEXT_LENGTH", "10"))
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "60"))
     
-    class Config:
-        env_file = ".env"
+    # CORS Configuration
+    cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    
+    # Model Settings
+    llm_temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.7"))
+    llm_top_p: float = float(os.getenv("LLM_TOP_P", "0.9"))
+    
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 settings = Settings()

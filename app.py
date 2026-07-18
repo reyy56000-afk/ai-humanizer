@@ -26,12 +26,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
+# Parse CORS origins from settings
+cors_origins = settings.cors_origins.split(",") if isinstance(settings.cors_origins, str) else settings.cors_origins
+
+# Add CORS middleware with configurable origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -316,15 +319,21 @@ def analyze(request: TextRequest):
             raise HTTPException(status_code=400, detail=error_msg)
         
         text = request.text.strip()
+        word_count = count_words(text)
+        sentence_count = count_sentences(text)
+        
+        # Safely calculate averages to avoid division by zero
+        avg_word_length = (sum(len(w) for w in text.split()) / word_count) if word_count > 0 else 0
+        avg_sentence_length = (word_count / sentence_count) if sentence_count > 0 else 0
         
         return {
             "success": True,
             "statistics": {
                 "character_count": len(text),
-                "word_count": count_words(text),
-                "sentence_count": count_sentences(text),
-                "average_word_length": sum(len(w) for w in text.split()) / len(text.split()) if text.split() else 0,
-                "average_sentence_length": len(text.split()) / count_sentences(text) if count_sentences(text) > 0 else 0
+                "word_count": word_count,
+                "sentence_count": sentence_count,
+                "average_word_length": round(avg_word_length, 2),
+                "average_sentence_length": round(avg_sentence_length, 2)
             }
         }
     except Exception as e:

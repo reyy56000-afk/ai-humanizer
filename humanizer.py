@@ -2,11 +2,11 @@
 Enhanced Humanizer module for converting AI text to human-like writing.
 Handles various text processing and enhancement tasks.
 """
-from ollama import chat
+import logging
+import ollama
 from prompts import HUMANIZE_PROMPT, IMPROVE_PROMPT, SUMMARIZE_PROMPT, TONE_ADJUST_PROMPT
 from config import settings
 from utils import validate_text, sanitize_text
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,9 @@ def humanize_text(text: str) -> dict:
     Returns:
         Dictionary with humanized text and metadata
     """
+    # Sanitize text FIRST, then validate
+    text = sanitize_text(text)
+    
     # Validate input
     is_valid, error_msg = validate_text(text)
     if not is_valid:
@@ -30,13 +33,11 @@ def humanize_text(text: str) -> dict:
             "humanized": None
         }
     
-    # Sanitize text
-    text = sanitize_text(text)
-    
     prompt = HUMANIZE_PROMPT.format(text=text)
     
     try:
-        response = chat(
+        client = ollama.Client(base_url=settings.ollama_host)
+        response = client.chat(
             model=settings.ollama_model,
             messages=[
                 {
@@ -76,6 +77,9 @@ def improve_text(text: str) -> dict:
     Returns:
         Dictionary with improved text and metadata
     """
+    # Sanitize first, then validate
+    text = sanitize_text(text)
+    
     is_valid, error_msg = validate_text(text)
     if not is_valid:
         return {
@@ -84,11 +88,11 @@ def improve_text(text: str) -> dict:
             "improved": None
         }
     
-    text = sanitize_text(text)
     prompt = IMPROVE_PROMPT.format(text=text)
     
     try:
-        response = chat(
+        client = ollama.Client(base_url=settings.ollama_host)
+        response = client.chat(
             model=settings.ollama_model,
             messages=[{"role": "user", "content": prompt}],
             stream=False,
@@ -121,6 +125,9 @@ def summarize_text(text: str) -> dict:
     Returns:
         Dictionary with summary and metadata
     """
+    # Sanitize first, then validate
+    text = sanitize_text(text)
+    
     is_valid, error_msg = validate_text(text)
     if not is_valid:
         return {
@@ -129,11 +136,11 @@ def summarize_text(text: str) -> dict:
             "summary": None
         }
     
-    text = sanitize_text(text)
     prompt = SUMMARIZE_PROMPT.format(text=text)
     
     try:
-        response = chat(
+        client = ollama.Client(base_url=settings.ollama_host)
+        response = client.chat(
             model=settings.ollama_model,
             messages=[{"role": "user", "content": prompt}],
             stream=False,
@@ -179,6 +186,9 @@ def adjust_tone(text: str, tone: str) -> dict:
             "adjusted": None
         }
     
+    # Sanitize first, then validate
+    text = sanitize_text(text)
+    
     is_valid, error_msg = validate_text(text)
     if not is_valid:
         return {
@@ -187,11 +197,11 @@ def adjust_tone(text: str, tone: str) -> dict:
             "adjusted": None
         }
     
-    text = sanitize_text(text)
     prompt = TONE_ADJUST_PROMPT.format(text=text, tone=tone)
     
     try:
-        response = chat(
+        client = ollama.Client(base_url=settings.ollama_host)
+        response = client.chat(
             model=settings.ollama_model,
             messages=[{"role": "user", "content": prompt}],
             stream=False,

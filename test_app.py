@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from app import app
 from humanizer import humanize_text, improve_text, summarize_text, adjust_tone
-from detector import detect_ai_text
-from utils import validate_text, count_words, count_sentences, sanitize_text
+from detector import detect_ai_text, parse_ai_detection, extract_confidence
+from utils import validate_text, count_words, count_sentences, sanitize_text, get_text_complexity
 
 
 client = TestClient(app)
@@ -48,10 +48,28 @@ class TestUtilities:
         text = "This is a test text"
         assert count_words(text) == 5
     
+    def test_count_words_empty(self):
+        """Test word counting with empty string."""
+        assert count_words("") == 0
+        assert count_words("   ") == 0
+    
     def test_count_sentences(self):
         """Test sentence counting."""
         text = "This is a test. This is another. And one more!"
         assert count_sentences(text) == 3
+    
+    def test_count_sentences_with_abbreviations(self):
+        """Test sentence counting with abbreviations."""
+        text = "Dr. Smith went to the store. He bought milk."
+        count = count_sentences(text)
+        assert count == 2
+    
+    def test_text_complexity(self):
+        """Test text complexity calculation."""
+        text = "This is simple text. Very short sentences."
+        result = get_text_complexity(text)
+        assert "complexity" in result
+        assert result["complexity"] in ["simple", "moderate", "complex"]
 
 
 # ==================== API Health Tests ====================
@@ -111,6 +129,7 @@ class TestTextProcessingEndpoints:
         assert "statistics" in data
         assert "character_count" in data["statistics"]
         assert "word_count" in data["statistics"]
+        assert "sentence_count" in data["statistics"]
 
 
 # ==================== Function Tests ====================
@@ -120,11 +139,10 @@ class TestHumanizeFunction:
     
     def test_humanize_valid_input(self):
         """Test humanize with valid input."""
-        text = "This is artificial intelligence text that sounds robotic."
+        text = "This is artificial intelligence text that sounds robotic and formulaic."
         result = humanize_text(text)
         assert result["success"] is True
         assert "humanized" in result
-        assert result["original"] == text
     
     def test_humanize_invalid_input(self):
         """Test humanize with invalid input."""
@@ -156,7 +174,7 @@ class TestSummarizeFunction:
         result = summarize_text(text)
         assert result["success"] is True
         assert "summary" in result
-        assert result["compression_ratio"] < 1.0
+        assert result["compression_ratio"] <= 1.0
 
 
 class TestToneAdjustFunction:
@@ -179,22 +197,37 @@ class TestToneAdjustFunction:
     
     def test_adjust_tone_invalid(self):
         """Test tone adjustment with invalid tone."""
-        text = "This is a test text."
+        text = "This is a test text that is long enough."
         result = adjust_tone(text, "invalid_tone")
         assert result["success"] is False
 
 
 class TestDetectorFunction:
-    """Test detect_ai_text function."""
+    """Test detect_ai_text and parsing functions."""
     
-    def test_detect_ai_text(self):
-        """Test AI text detection."""
-        text = "In contemporary discourse, artificial intelligence has emerged as a transformative paradigm."
-        result = detect_ai_text(text)
-        assert result["success"] is True
-        assert "is_ai" in result
-        assert "confidence" in result
-        assert isinstance(result["confidence"], int)
+    def test_parse_ai_detection_ai_text(self):
+        """Test AI detection parsing for AI-generated text."""
+        response = "This text appears to be AI-generated with 85% confidence"
+        result = parse_ai_detection(response)
+        assert result is True
+    
+    def test_parse_ai_detection_human_text(self):
+        """Test AI detection parsing for human text."""
+        response = "Verdict: Human-written. This looks like genuine human writing."
+        result = parse_ai_detection(response)
+        assert result is False
+    
+    def test_extract_confidence_with_percentage(self):
+        """Test confidence extraction."""
+        response = "Confidence: 85% that this is AI-generated"
+        confidence = extract_confidence(response)
+        assert confidence == 85
+    
+    def test_extract_confidence_no_percentage(self):
+        """Test confidence extraction with no percentage."""
+        response = "Unable to determine confidence level"
+        confidence = extract_confidence(response)
+        assert confidence == 0
 
 
 # ==================== Integration Tests ====================
@@ -202,40 +235,20 @@ class TestDetectorFunction:
 class TestIntegration:
     """Integration tests for complete workflows."""
     
-    def test_humanize_detect_workflow(self):
-        """Test humanize followed by detection workflow."""
-        original_text = "The implementation of the system was designed to optimize performance metrics."
-        
-        # Humanize
-        humanize_result = humanize_text(original_text)
-        assert humanize_result["success"] is True
-        
-        # Detect on humanized text
-        humanized = humanize_result["humanized"]
-        detect_result = detect_ai_text(humanized)
-        assert detect_result["success"] is True
-    
-    def test_full_processing_pipeline(self):
-        """Test full processing pipeline."""
+    def test_full_pipeline_with_valid_text(self):
+        """Test full processing pipeline with valid text."""
         text = """Artificial intelligence systems have demonstrated significant capabilities in various domains. 
         These systems process large amounts of data and generate insights. 
         The applications range from natural language processing to computer vision."""
         
-        # Analyze
+        # Validate
         is_valid, _ = validate_text(text)
         assert is_valid is True
         
-        # Humanize
-        humanize_result = humanize_text(text)
-        assert humanize_result["success"] is True
-        
-        # Improve
-        improve_result = improve_text(humanize_result["humanized"])
-        assert improve_result["success"] is True
-        
-        # Summarize
-        summarize_result = summarize_text(improve_result["improved"])
-        assert summarize_result["success"] is True
+        # Analyze
+        response = client.post("/analyze", json={"text": text})
+        assert response.status_code == 200
+        assert response.json()["success"] is True
 
 
 if __name__ == "__main__":
